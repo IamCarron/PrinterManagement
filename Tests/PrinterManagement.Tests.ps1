@@ -34,9 +34,11 @@ if (-not (Get-Command -Name Out-GridView -ErrorAction SilentlyContinue)) {
     function global:Out-GridView { [CmdletBinding()] param([Parameter(ValueFromPipeline)]$InputObject, $Title, [switch]$PassThru) }
 }
 
+$env:PRINTER_MANAGEMENT_TEST_MODE = "true"
+
 BeforeAll {
+    $env:PRINTER_MANAGEMENT_TEST_MODE = "true"
     $script:ScriptPath = Join-Path -Path $PSScriptRoot -ChildPath "..\PrinterManagement.ps1"
-    $env:PRINTER_MANAGEMENT_TESTING = "true"
 
     # Try to import Windows PrintManagement module if available
     try {
@@ -52,7 +54,7 @@ BeforeAll {
 }
 
 AfterAll {
-    $env:PRINTER_MANAGEMENT_TESTING = $null
+    $env:PRINTER_MANAGEMENT_TEST_MODE = $null
     if (Test-Path -Path $script:TestTempDir) {
         Remove-Item -Path $script:TestTempDir -Recurse -Force -ErrorAction SilentlyContinue
     }

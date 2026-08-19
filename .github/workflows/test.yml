@@ -29,6 +29,8 @@ jobs:
           Install-Module -Name Pester -MinimumVersion 5.3.0 -Scope CurrentUser -Force -SkipPublisherCheck
 
       - name: Run Pester Tests
+        env:
+          PRINTER_MANAGEMENT_TEST_MODE: "true"
         run: |
           $config = New-PesterConfiguration
           $config.Run.Path = "Tests/PrinterManagement.Tests.ps1"

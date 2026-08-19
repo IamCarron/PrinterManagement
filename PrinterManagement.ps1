@@ -640,15 +640,18 @@ function Show-ActivityLog {
     }
 }
 
-# Main application interactive loop (only executed if run directly, not dot-sourced in tests)
-if ($MyInvocation.InvocationName -ne '.' -and -not $env:PRINTER_MANAGEMENT_TESTING) {
+# Function to start the interactive management console
+function Start-PrinterManagement {
+    [CmdletBinding()]
+    param()
+
     # Check for Administrator privileges
     $isAdmin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
     if (-not $isAdmin) {
         Write-Host "`n[!] ERROR: This script requires administrator privileges." -ForegroundColor Red
         Write-Host "Please right-click PowerShell and select 'Run as Administrator'.`n" -ForegroundColor Yellow
         Read-Host -Prompt "Press Enter to exit..."
-        exit
+        return
     }
 
     do {
@@ -682,5 +685,10 @@ if ($MyInvocation.InvocationName -ne '.' -and -not $env:PRINTER_MANAGEMENT_TESTI
             }
         }
     } while ($option -ne "8")
+}
+
+# Auto-run menu when executed directly (not in test mode)
+if (-not $env:PRINTER_MANAGEMENT_TEST_MODE) {
+    Start-PrinterManagement
 }
 
