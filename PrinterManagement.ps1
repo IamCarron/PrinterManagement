@@ -1,4 +1,4 @@
-﻿<#
+<#
 .SYNOPSIS
     Advanced Printer Management Tool for Windows Environments.
 .DESCRIPTION
@@ -197,7 +197,7 @@ function Add-Printers {
         return @{ Total = 0; Success = 0; Failed = 0 }
     }
 
-    $printerList = Import-SmartCsv -Path $printersFile
+    $printerList = @(Import-SmartCsv -Path $printersFile)
     if (-not $printerList -or $printerList.Count -eq 0) {
         Write-Log "No valid printer records found in CSV." "WARN"
         if (-not $FilePath) { Read-Host -Prompt "`nPress Enter to return to menu..." }
@@ -305,7 +305,7 @@ function Remove-Printers {
     if ($PrinterList -and $PrinterList.Count -gt 0) {
         $printersToRemove = $PrinterList
     } elseif (-not [string]::IsNullOrWhiteSpace($FilePath)) {
-        $printersToRemove = Import-SmartCsv -Path $FilePath
+        $printersToRemove = @(Import-SmartCsv -Path $FilePath)
     } else {
         Write-Host "1. Remove printers specified in CSV"
         Write-Host "2. Select printers interactively from GUI list"
@@ -315,7 +315,7 @@ function Remove-Printers {
         if ($subOption -eq "1") {
             $printersFile = Get-ValidFilePath -Title "Select CSV File to Remove Printers"
             if (-not $printersFile) { return @{ Total = 0; Success = 0; Failed = 0 } }
-            $printersToRemove = Import-SmartCsv -Path $printersFile
+            $printersToRemove = @(Import-SmartCsv -Path $printersFile)
         } elseif ($subOption -eq "2") {
             try {
                 $installed = Get-CimInstance -ClassName Win32_Printer | Select-Object Name, PortName, DriverName
@@ -368,7 +368,7 @@ function Remove-Printers {
         $pName = $item.Name
         $pPort = if ($item.LocalPort) { $item.LocalPort } else { "" }
 
-        Write-Progress -Activity "Removing Printers" -Status "[$index/$total] Removing: $pName" -PercentComplete [int](($index / $total) * 100)
+        Write-Progress -Activity "Removing Printers" -Status "[$index/$total] Removing: $pName" -PercentComplete $([int](($index / $total) * 100))
 
         # Remove Printer
         $printerExists = Get-Printer -Name $pName -ErrorAction SilentlyContinue
@@ -420,14 +420,14 @@ function Send-TestPages {
     if ($PrinterList -and $PrinterList.Count -gt 0) {
         $printersToTest = $PrinterList
     } elseif (-not [string]::IsNullOrWhiteSpace($FilePath)) {
-        $printersToTest = Import-SmartCsv -Path $FilePath
+        $printersToTest = @(Import-SmartCsv -Path $FilePath)
     } else {
         $printersFile = Get-ValidFilePath -Title "Select CSV File for Test Pages"
         if (-not $printersFile) {
             Read-Host -Prompt "`nPress Enter to return to menu..."
             return @{ Total = 0; Success = 0; Failed = 0 }
         }
-        $printersToTest = Import-SmartCsv -Path $printersFile
+        $printersToTest = @(Import-SmartCsv -Path $printersFile)
     }
 
     if (-not $printersToTest -or $printersToTest.Count -eq 0) {
@@ -446,7 +446,7 @@ function Send-TestPages {
     foreach ($printer in $printersToTest) {
         $index++
         $pName = $printer.Name
-        Write-Progress -Activity "Dispatching Test Pages" -Status "[$index/$total] Testing: $pName" -PercentComplete [int](($index / $total) * 100)
+        Write-Progress -Activity "Dispatching Test Pages" -Status "[$index/$total] Testing: $pName" -PercentComplete $([int](($index / $total) * 100))
 
         $printerObj = Get-Printer -Name $pName -ErrorAction SilentlyContinue
         if (-not $printerObj) {

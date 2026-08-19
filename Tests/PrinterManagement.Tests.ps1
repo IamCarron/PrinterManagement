@@ -1,4 +1,4 @@
-﻿#Requires -Module Pester
+#Requires -Module Pester
 
 <#
 .SYNOPSIS
@@ -197,7 +197,7 @@ Shared_HP;\\printserver01\Shared_HP;HP Universal Driver
             $result.Total | Should -Be 1
             $result.Success | Should -Be 1
             $result.Failed | Should -Be 0
-            Assert-VerifiableMock
+            Should -InvokeVerifiable
         }
     }
 
@@ -219,7 +219,7 @@ Office_Epson;192.168.1.100;Epson Driver
             $result.Total | Should -Be 1
             $result.Success | Should -Be 1
             $result.Failed | Should -Be 0
-            Assert-VerifiableMock
+            Should -InvokeVerifiable
         }
 
         It "Skips installation and warns when driver is not installed" {
@@ -258,7 +258,7 @@ Describe "6. Printer Removal (Remove-Printers)" {
         $result.Total | Should -Be 1
         $result.Success | Should -Be 1
         $result.Failed | Should -Be 0
-        Assert-VerifiableMock
+        Should -InvokeVerifiable
     }
 }
 
@@ -276,7 +276,7 @@ Describe "7. Print Queue Clearing (Clear-PrintQueues)" {
 
         $result = Clear-PrintQueues -Force
         $result | Should -BeTrue
-        Assert-VerifiableMock
+        Should -InvokeVerifiable
     }
 }
 
