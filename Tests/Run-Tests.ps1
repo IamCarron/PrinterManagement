@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     Automated Test Runner for PrinterManagement.
 .DESCRIPTION
