@@ -55,8 +55,6 @@ function Write-Log {
     } catch {
         # Silent continue if log file write fails
     }
-
-    return $logEntry
 }
 
 # Function to display banner

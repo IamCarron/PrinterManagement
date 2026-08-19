@@ -1,4 +1,4 @@
-﻿#Requires -Module Pester
+#Requires -Module Pester
 
 <#
 .SYNOPSIS
@@ -144,7 +144,7 @@ Color_Laser,10.0.0.15,Epson Universal
     It "Returns $null when file does not exist" {
         $nonExistent = Join-Path -Path $script:TestTempDir -ChildPath "missing.csv"
         $result = Import-SmartCsv -Path $nonExistent
-        $result | Should -BeNullOrEmpty
+        ($null -eq $result) | Should -BeTrue
     }
 }
 
@@ -160,7 +160,7 @@ Describe "3. File Path Resolution (Get-ValidFilePath)" {
     It "Returns $null when direct file path does not exist" {
         $missingFile = Join-Path -Path $script:TestTempDir -ChildPath "does_not_exist.csv"
         $resolved = Get-ValidFilePath -FilePath $missingFile
-        $resolved | Should -BeNullOrEmpty
+        ($null -eq $resolved) | Should -BeTrue
     }
 }
 
