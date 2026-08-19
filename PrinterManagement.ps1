@@ -1,254 +1,688 @@
-# Clear the console at the beginning
-Clear-Host
+#Requires -RunAsAdministrator
 
-# Banner
-@'
+<#
+.SYNOPSIS
+    Advanced Printer Management Tool for Windows Environments.
+.DESCRIPTION
+    Automates printer installation, removal, test page dispatch, spooler cleanup,
+    and inventorying with interactive TUI, GUI dialogs, logs, and progress reporting.
+.VERSION
+    3.1.0
+#>
 
-   ___      _      __          __  ___                                       __    
-  / _ \____(_)__  / /____ ____/  |/  /__ ____  ___ ____ ____ __ _  ___ ___  / /_   
- / ___/ __/ / _ \/ __/ -_) __/ /|_/ / _ `/ _ \/ _ `/ _ `/ -_)  ' \/ -_) _ \/ __/   
-/_/  /_/ /_/_//_/\__/\__/_/ /_/  /_/\_,_/_//_/\_,_/\_, /\__/_/_/_/\__/_//_/\__/    
-                                                  /___/                                                                                         
-Version: 2.5.1                                            
-'@
-
-# Function to handle errors
-function Handle-Error {
-    param (
-        [string]$errorMessage
-    )
-    Write-Host "Error: $errorMessage" -ForegroundColor Red
+# Load Windows Forms for GUI dialogs if available
+try {
+    Add-Type -AssemblyName System.Windows.Forms -ErrorAction SilentlyContinue
+} catch {
+    # Non-GUI environments (e.g. Server Core)
 }
 
-function Validate-FilePath {
+# Configuration
+$script:LogFile = Join-Path -Path (if ($PSScriptRoot) { $PSScriptRoot } else { "." }) -ChildPath "PrinterManagement.log"
+
+# Logging function
+function Write-Log {
     param (
-        [string]$filePath
+        [Parameter(Mandatory = $true)]
+        [string]$Message,
+
+        [ValidateSet("INFO", "SUCCESS", "WARN", "ERROR")]
+        [string]$Level = "INFO",
+
+        [string]$CustomLogPath = $script:LogFile
     )
 
-    while (-not (Test-Path $filePath -PathType Leaf) -or [string]::IsNullOrWhiteSpace($filePath)) {
-        Write-Warning "The file path is invalid or empty. Please try again."
-        $filePath = Read-Host "Enter the file path"
+    $timestamp = (Get-Date).ToString("yyyy-MM-dd HH:mm:ss")
+    $logEntry = "[$timestamp] [$Level] $Message"
+
+    $colorMap = @{
+        "INFO"    = "Cyan"
+        "SUCCESS" = "Green"
+        "WARN"    = "Yellow"
+        "ERROR"   = "Red"
     }
 
-    return $filePath
+    $iconMap = @{
+        "INFO"    = "[i]"
+        "SUCCESS" = "[✓]"
+        "WARN"    = "[!]"
+        "ERROR"   = "[✗]"
+    }
+
+    Write-Host "$($iconMap[$Level]) $Message" -ForegroundColor $colorMap[$Level]
+
+    # Append to log file
+    try {
+        Add-Content -Path $CustomLogPath -Value $logEntry -Encoding UTF8 -ErrorAction SilentlyContinue
+    } catch {
+        # Silent continue if log file write fails
+    }
+
+    return $logEntry
 }
 
+# Function to display banner
+function Show-Banner {
+    Clear-Host
+    Write-Host @'
+ ╔════════════════════════════════════════════════════════════════════════════╗
+ ║   ___      _      __          __  ___                                      ║
+ ║  / _ \____(_)__  / /____ ____/  |/  /__ ____  ___ ____ ____ __ _  ___ ___  ║
+ ║ / ___/ __/ / _ \/ __/ -_) __/ /|_/ / _ `/ _ \/ _ `/ _ `/ -_)  ' \/ -_) _ \ ║
+ ║/_/  /_/ /_/_//_/\__/\__/_/ /_/  /_/\_,_/_//_/\_,_/\_, /\__/_/_/_/\__/_//_/ ║
+ ║                                                  /___/                     ║
+ ║                      Windows Printer Management Suite                      ║
+ ║                                Version 3.1.0                               ║
+ ╚════════════════════════════════════════════════════════════════════════════╝
+'@ -ForegroundColor Cyan
+}
+
+# GUI & CLI File Picker
+function Get-ValidFilePath {
+    param (
+        [string]$FilePath = "",
+        [string]$Title = "Select Printer CSV File",
+        [string]$Filter = "CSV Files (*.csv)|*.csv|All Files (*.*)|*.*"
+    )
+
+    if (-not [string]::IsNullOrWhiteSpace($FilePath)) {
+        $clean = $FilePath.Trim('"').Trim("'")
+        if (Test-Path -Path $clean -PathType Leaf) {
+            return (Resolve-Path -Path $clean).Path
+        }
+        Write-Log "Specified path '$clean' does not exist." "ERROR"
+        return $null
+    }
+
+    Write-Host "`nSelect CSV File:" -ForegroundColor Yellow
+    Write-Host "  • Press [Enter] to open GUI File Explorer" -ForegroundColor DarkGray
+    Write-Host "  • Or type / paste the file path directly" -ForegroundColor DarkGray
+    $inputPath = Read-Host -Prompt "File path"
+
+    if ([string]::IsNullOrWhiteSpace($inputPath)) {
+        # Attempt to open GUI File Dialog
+        try {
+            $openFileDialog = New-Object System.Windows.Forms.OpenFileDialog
+            $openFileDialog.InitialDirectory = [System.IO.Directory]::GetCurrentDirectory()
+            $openFileDialog.Filter = $Filter
+            $openFileDialog.Title = $Title
+            $openFileDialog.ShowHelp = $false
+
+            $dialogResult = $openFileDialog.ShowDialog()
+            if ($dialogResult -eq [System.Windows.Forms.DialogResult]::OK) {
+                Write-Log "Selected file via GUI: $($openFileDialog.FileName)" "INFO"
+                return $openFileDialog.FileName
+            } else {
+                Write-Log "File selection cancelled by user." "WARN"
+                return $null
+            }
+        } catch {
+            Write-Log "GUI file picker unavailable in this environment. Please enter path manually." "WARN"
+            $manualPath = Read-Host -Prompt "Enter CSV file path"
+            if (-not [string]::IsNullOrWhiteSpace($manualPath) -and (Test-Path -Path $manualPath.Trim('"').Trim("'") -PathType Leaf)) {
+                return (Resolve-Path -Path $manualPath.Trim('"').Trim("'")).Path
+            }
+            return $null
+        }
+    } else {
+        $cleanPath = $inputPath.Trim('"').Trim("'")
+        if (Test-Path -Path $cleanPath -PathType Leaf) {
+            $resolved = (Resolve-Path -Path $cleanPath).Path
+            Write-Log "Selected file via CLI: $resolved" "INFO"
+            return $resolved
+        } else {
+            Write-Log "The path '$cleanPath' is invalid or does not exist." "ERROR"
+            return $null
+        }
+    }
+}
+
+# Smart CSV Importer
+function Import-SmartCsv {
+    param (
+        [Parameter(Mandatory = $true)]
+        [string]$Path
+    )
+
+    if (-not (Test-Path -Path $Path -PathType Leaf)) {
+        Write-Log "File not found: $Path" "ERROR"
+        return $null
+    }
+
+    # Detect delimiter safely
+    $firstLine = (Get-Content -Path $Path -TotalCount 1)
+    $delimiter = ';'
+    if ($firstLine -match ';') {
+        $delimiter = ';'
+    } elseif ($firstLine -match ',') {
+        $delimiter = ','
+    } elseif ($firstLine -match "`t") {
+        $delimiter = "`t"
+    }
+
+    Write-Log "Reading CSV with detected delimiter: '$delimiter'" "INFO"
+
+    try {
+        $data = Import-Csv -Path $Path -Delimiter $delimiter -Encoding UTF8 -ErrorAction Stop
+
+        # Normalize properties
+        $normalizedList = @()
+        foreach ($row in $data) {
+            $nameVal = if ($row.Name) { $row.Name } elseif ($row.PrinterName) { $row.PrinterName } else { "" }
+            $portVal = if ($row.LocalPort) { $row.LocalPort } elseif ($row.Port) { $row.Port } elseif ($row.PortName) { $row.PortName } else { "" }
+            $driverVal = if ($row.DriverName) { $row.DriverName } elseif ($row.Driver) { $row.Driver } else { "" }
+
+            if (-not [string]::IsNullOrWhiteSpace($nameVal)) {
+                $normalizedList += [PSCustomObject]@{
+                    Name       = $nameVal.ToString().Trim()
+                    LocalPort  = $portVal.ToString().Trim()
+                    DriverName = $driverVal.ToString().Trim()
+                }
+            }
+        }
+        return $normalizedList
+    } catch {
+        Write-Log "Error parsing CSV file: $_" "ERROR"
+        return $null
+    }
+}
+
+# Function to add printers
 function Add-Printers {
-    # Script title
-    Write-Host "Adding printers by local port and IP"
+    param (
+        [string]$FilePath = ""
+    )
 
-    # Show current folder location
-    Get-ChildItem
+    Write-Host "`n═══════════════════ [1. ADD PRINTERS] ═══════════════════" -ForegroundColor Yellow
 
-    # Loop until a valid printer file path is entered
-    $printersFile = Validate-FilePath -filePath (Read-Host "Enter the printer file path")
+    $printersFile = Get-ValidFilePath -FilePath $FilePath -Title "Select CSV File to Add Printers"
+    if (-not $printersFile) {
+        if (-not $FilePath) { Read-Host -Prompt "`nPress Enter to return to menu..." }
+        return @{ Total = 0; Success = 0; Failed = 0 }
+    }
 
-    # Import printers file in CSV format with ';' as delimiter
-    $printerList = Import-Csv $printersFile -Delimiter ';'
+    $printerList = Import-SmartCsv -Path $printersFile
+    if (-not $printerList -or $printerList.Count -eq 0) {
+        Write-Log "No valid printer records found in CSV." "WARN"
+        if (-not $FilePath) { Read-Host -Prompt "`nPress Enter to return to menu..." }
+        return @{ Total = 0; Success = 0; Failed = 0 }
+    }
 
-    # Show start message
-    Write-Host "Starting..."
+    $total = $printerList.Count
+    Write-Log "Starting installation of $total printer(s)..." "INFO"
 
-    # Create printers specified in the printers file
+    $index = 0
+    $successCount = 0
+    $failCount = 0
+
     foreach ($printer in $printerList) {
-        Write-Host "Creating printer $($printer.Name) on port $($printer.LocalPort)"
+        $index++
+        $percent = [int](($index / $total) * 100)
+        Write-Progress -Activity "Installing Printers" -Status "[$index/$total] Processing: $($printer.Name)" -PercentComplete $percent
 
-        # Check if printer port already exists, if not, create it
-        $portExists = Get-PrinterPort -Name $printer.LocalPort -ErrorAction SilentlyContinue
+        $pName   = $printer.Name
+        $pPort   = $printer.LocalPort
+        $pDriver = $printer.DriverName
+
+        # Case 1: Shared Network Printer (UNC Path: \\server\printer)
+        if ($pPort -like "\\*" -or $pName -like "\\*") {
+            $connectionPath = if ($pPort -like "\\*") { $pPort } else { $pName }
+            Write-Log "Connecting to network shared printer: '$connectionPath'..." "INFO"
+            try {
+                Add-Printer -ConnectionName $connectionPath -ErrorAction Stop
+                Write-Log "Successfully connected to shared printer '$connectionPath'." "SUCCESS"
+                $successCount++
+            } catch {
+                Write-Log "Failed to connect to shared printer '$connectionPath': $_" "ERROR"
+                $failCount++
+            }
+            continue
+        }
+
+        # Case 2: Standard Printer (Local / TCP-IP)
+        if ([string]::IsNullOrWhiteSpace($pPort) -or [string]::IsNullOrWhiteSpace($pDriver)) {
+            Write-Log "Skipping '$pName': Missing Port or Driver." "WARN"
+            $failCount++
+            continue
+        }
+
+        # Create Port if needed
+        $portExists = Get-PrinterPort -Name $pPort -ErrorAction SilentlyContinue
         if (-not $portExists) {
             try {
-                if ($printer.LocalPort -match "^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$") {
-                    Add-PrinterPort -Name $printer.LocalPort -PrinterHostAddress $printer.LocalPort
+                # If IPv4 address or standard TCP hostname
+                $isIpAddress = $pPort -match "^((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$"
+                $isHostname  = ($pPort -match "^[a-zA-Z0-9\.\-_]+$" -and $pPort -notmatch "^(USB|COM|LPT|FILE|PORTPROMPT|NUL)\d*[:]?$")
+
+                if ($isIpAddress -or $isHostname) {
+                    Add-PrinterPort -Name $pPort -PrinterHostAddress $pPort -ErrorAction Stop
                 } else {
-                    Add-PrinterPort -Name $printer.LocalPort
+                    Add-PrinterPort -Name $pPort -ErrorAction Stop
                 }
+                Write-Log "Created printer port '$pPort'." "SUCCESS"
             } catch {
-                Handle-Error "Error creating port $($printer.LocalPort): $_"
-                continue  # Jump to the next iteration of the loop in case of error
+                Write-Log "Error creating port '$pPort': $_" "ERROR"
+                $failCount++
+                continue
             }
         }
 
-        # Check if printer driver is already installed, if not, show a warning
-        $printDriverExists = Get-PrinterDriver -Name $printer.Driver -ErrorAction SilentlyContinue
-        if ($printDriverExists) {
-            try {
-                Add-Printer -Name $printer.Name -PortName $printer.LocalPort -DriverName $printer.Driver -ErrorAction Stop
-                Write-Host "Printer $($printer.Name) created on port $($printer.LocalPort)"
-            } catch {
-                Handle-Error "Error adding printer $($printer.Name): $_"
-                Write-Host "Error details:"
-                Write-Host $_.Exception.Message
-                Write-Host $_.Exception.StackTrace
-            }
-        } else {
-            Write-Warning "Printer driver $($printer.Name) is not installed."
+        # Verify Driver
+        $driverExists = Get-PrinterDriver -Name $pDriver -ErrorAction SilentlyContinue
+        if (-not $driverExists) {
+            Write-Log "Driver '$pDriver' is NOT installed on this system. Skipping '$pName'." "ERROR"
+            $failCount++
+            continue
+        }
+
+        # Add Printer
+        try {
+            Add-Printer -Name $pName -PortName $pPort -DriverName $pDriver -ErrorAction Stop
+            Write-Log "Installed printer '$pName' on port '$pPort' with driver '$pDriver'." "SUCCESS"
+            $successCount++
+        } catch {
+            Write-Log "Failed to add printer '$pName': $_" "ERROR"
+            $failCount++
         }
     }
 
-    # Print a completion message
-    Read-Host -Prompt "Printers created successfully. Press any key to extit..."
-}
+    Write-Progress -Activity "Installing Printers" -Completed
+    Write-Host "`n─────────────────────────────────────────────────────────" -ForegroundColor DarkGray
+    Write-Log "Finished: $successCount installed successfully, $failCount failed." $(if ($failCount -eq 0) { "SUCCESS" } else { "WARN" })
+    if (-not $FilePath) { Read-Host -Prompt "`nPress Enter to return to menu..." }
 
-# Function to send test pages
-function Send-TestPages {
-    # Script title
-    Write-Host "Sending test pages in bulk"
-
-    # Show current folder location
-    Get-ChildItem
-
-    # Loop until a valid printer file path is entered
-    # Ensure provided path exists and is not empty.
-    do {
-        $printersFile = Read-Host "Enter the printer file path"
-
-        if (-not [string]::IsNullOrWhiteSpace($printersFile) -and -not (Test-Path $printersFile)) {
-            Write-Warning "The file path is invalid. Please try again."
-        }
-    } until (-not [string]::IsNullOrWhiteSpace($printersFile) -and (Test-Path $printersFile))
-
-    # Show a message indicating that the printers file is being read.
-    Write-Host "Reading file $printersFile..."
-
-    # Read the printers file and store printer names in the $printers variable.
-    $printers = Import-Csv -Path $printersFile -Delimiter ';'
-
-    # Send a test page to each printer.
-    foreach ($printer in $printers) {
-        # Show a message indicating that a test page is being sent to the printer.
-        Write-Host "Sending test page to $($printer.Name) on port $($printer.LocalPort)..."
-        
-        # Execute the print command in the background
-        $jobScript = {
-            param ($printer, $env:COMPUTERNAME)
-            $command = "rundll32.exe printui.dll,PrintUIEntry /k /n\\$env:COMPUTERNAME\$($printer.Name)"
-            Start-Process cmd -ArgumentList "/c $command" -NoNewWindow -Wait
-        }
-
-        Start-Job -ScriptBlock $jobScript -ArgumentList $printer, $env:COMPUTERNAME | Wait-Job | Receive-Job
-
-        Write-Host "Test page sent successfully to $($printer.Name) on port $($printer.LocalPort)."
-    }
-
-    # Show a confirmation message that test pages have been sent to all printers.
-    Read-Host -Prompt "Completed sending test pages to all printers. Press any key to exit..."
+    return @{ Total = $total; Success = $successCount; Failed = $failCount }
 }
 
 # Function to remove printers
 function Remove-Printers {
-    # Script title
-    Write-Host "Removing printers."
+    param (
+        [string]$FilePath = "",
+        [array]$PrinterList = @(),
+        [switch]$Force
+    )
 
-    # Show current folder location
-    Get-ChildItem
+    Write-Host "`n══════════════════ [2. REMOVE PRINTERS] ══════════════════" -ForegroundColor Yellow
 
-    # Loop until a valid printer file path is entered
-    $printersFile = Validate-FilePath -filePath (Read-Host "Enter the printer file path")
+    $printersToRemove = @()
 
-    # Import printers list from CSV file
-    $printerList = Import-Csv $printersFile -Delimiter ';'
+    if ($PrinterList -and $PrinterList.Count -gt 0) {
+        $printersToRemove = $PrinterList
+    } elseif (-not [string]::IsNullOrWhiteSpace($FilePath)) {
+        $printersToRemove = Import-SmartCsv -Path $FilePath
+    } else {
+        Write-Host "1. Remove printers specified in CSV"
+        Write-Host "2. Select printers interactively from GUI list"
+        Write-Host "3. Cancel"
+        $subOption = Read-Host "`nChoose an option (1-3)"
 
-    # Start the process of removing printers and ports
-    Write-Host "Starting..."
-
-    foreach ($printer in $printerList) {
-        # Remove the printer
-        Write-Host "Removing printer $($printer.Name)"
-        $printerExists = Get-Printer -Name $printer.Name -ErrorAction SilentlyContinue
-        if ($printerExists) {
-            Remove-Printer -Name $printer.Name
-            Write-Host "Printer $($printer.Name) removed."
+        if ($subOption -eq "1") {
+            $printersFile = Get-ValidFilePath -Title "Select CSV File to Remove Printers"
+            if (-not $printersFile) { return @{ Total = 0; Success = 0; Failed = 0 } }
+            $printersToRemove = Import-SmartCsv -Path $printersFile
+        } elseif ($subOption -eq "2") {
+            try {
+                $installed = Get-CimInstance -ClassName Win32_Printer | Select-Object Name, PortName, DriverName
+                $selected = $installed | Out-GridView -Title "Select printers to remove (Hold Ctrl/Shift to select multiple)" -PassThru
+                if ($selected) {
+                    $printersToRemove = $selected | ForEach-Object {
+                        [PSCustomObject]@{
+                            Name      = $_.Name
+                            LocalPort = $_.PortName
+                        }
+                    }
+                } else {
+                    Write-Log "No printers selected." "WARN"
+                    Read-Host -Prompt "`nPress Enter to return to menu..."
+                    return @{ Total = 0; Success = 0; Failed = 0 }
+                }
+            } catch {
+                Write-Log "Error opening selection grid: $_" "ERROR"
+                return @{ Total = 0; Success = 0; Failed = 0 }
+            }
         } else {
-            # Show a warning message if the printer does not exist
-            Write-Warning "Printer $($printer.Name) does not exist."
-        }
-
-        # Remove the printer port
-        Write-Host "Removing port $($printer.LocalPort)"
-        $portExists = Get-PrinterPort -Name $printer.LocalPort -ErrorAction SilentlyContinue
-        if ($portExists) {
-            Remove-PrinterPort -Name $printer.LocalPort
-            Write-Host "Port $($printer.LocalPort) removed."
-        } else {
-            # Show a warning message if the port does not exist
-            Write-Warning "Port $($printer.LocalPort) does not exist."
+            return @{ Total = 0; Success = 0; Failed = 0 }
         }
     }
-    # Show a confirmation message that all the printers and ports have been removed.
-    Read-Host -Prompt "All printers have been removed. Press any key to exit..."
+
+    if (-not $printersToRemove -or $printersToRemove.Count -eq 0) {
+        Write-Log "No printers specified for removal." "WARN"
+        if (-not $Force) { Read-Host -Prompt "`nPress Enter to return to menu..." }
+        return @{ Total = 0; Success = 0; Failed = 0 }
+    }
+
+    # Security Confirmation
+    if (-not $Force) {
+        Write-Host "`n[!] ATTENTION: You are about to remove $($printersToRemove.Count) printer(s)." -ForegroundColor Yellow
+        $confirm = Read-Host "Are you sure you want to proceed? (Y/N)"
+        if ($confirm -notmatch '^(y|s|yes|si)$') {
+            Write-Log "Printer removal aborted by user." "INFO"
+            Read-Host -Prompt "`nPress Enter to return to menu..."
+            return @{ Total = 0; Success = 0; Failed = 0 }
+        }
+    }
+
+    $total = $printersToRemove.Count
+    $index = 0
+    $successCount = 0
+    $failCount = 0
+
+    foreach ($item in $printersToRemove) {
+        $index++
+        $pName = $item.Name
+        $pPort = if ($item.LocalPort) { $item.LocalPort } else { "" }
+
+        Write-Progress -Activity "Removing Printers" -Status "[$index/$total] Removing: $pName" -PercentComplete [int](($index / $total) * 100)
+
+        # Remove Printer
+        $printerExists = Get-Printer -Name $pName -ErrorAction SilentlyContinue
+        if ($printerExists) {
+            try {
+                Remove-Printer -Name $pName -ErrorAction Stop
+                Write-Log "Printer '$pName' removed." "SUCCESS"
+                $successCount++
+            } catch {
+                Write-Log "Error removing printer '$pName': $_" "ERROR"
+                $failCount++
+            }
+        } else {
+            Write-Log "Printer '$pName' does not exist." "WARN"
+        }
+
+        # Remove Port if provided and port exists
+        if (-not [string]::IsNullOrWhiteSpace($pPort)) {
+            $portExists = Get-PrinterPort -Name $pPort -ErrorAction SilentlyContinue
+            if ($portExists) {
+                try {
+                    Remove-PrinterPort -Name $pPort -ErrorAction Stop
+                    Write-Log "Port '$pPort' removed." "SUCCESS"
+                } catch {
+                    Write-Log "Error removing port '$pPort': $_" "WARN"
+                }
+            }
+        }
+    }
+
+    Write-Progress -Activity "Removing Printers" -Completed
+    Write-Host "`n─────────────────────────────────────────────────────────" -ForegroundColor DarkGray
+    Write-Log "Removal process completed. Processed: $total printer(s)." "SUCCESS"
+    if (-not $Force) { Read-Host -Prompt "`nPress Enter to return to menu..." }
+
+    return @{ Total = $total; Success = $successCount; Failed = $failCount }
+}
+
+# Function to send test pages
+function Send-TestPages {
+    param (
+        [string]$FilePath = "",
+        [array]$PrinterList = @()
+    )
+
+    Write-Host "`n═════════════════ [3. SEND TEST PAGES] ═════════════════" -ForegroundColor Yellow
+
+    $printersToTest = @()
+    if ($PrinterList -and $PrinterList.Count -gt 0) {
+        $printersToTest = $PrinterList
+    } elseif (-not [string]::IsNullOrWhiteSpace($FilePath)) {
+        $printersToTest = Import-SmartCsv -Path $FilePath
+    } else {
+        $printersFile = Get-ValidFilePath -Title "Select CSV File for Test Pages"
+        if (-not $printersFile) {
+            Read-Host -Prompt "`nPress Enter to return to menu..."
+            return @{ Total = 0; Success = 0; Failed = 0 }
+        }
+        $printersToTest = Import-SmartCsv -Path $printersFile
+    }
+
+    if (-not $printersToTest -or $printersToTest.Count -eq 0) {
+        Write-Log "No valid printers found in CSV." "WARN"
+        if (-not $FilePath) { Read-Host -Prompt "`nPress Enter to return to menu..." }
+        return @{ Total = 0; Success = 0; Failed = 0 }
+    }
+
+    $total = $printersToTest.Count
+    $index = 0
+    $successCount = 0
+    $failCount = 0
+
+    Write-Log "Sending test pages to $total printer(s)..." "INFO"
+
+    foreach ($printer in $printersToTest) {
+        $index++
+        $pName = $printer.Name
+        Write-Progress -Activity "Dispatching Test Pages" -Status "[$index/$total] Testing: $pName" -PercentComplete [int](($index / $total) * 100)
+
+        $printerObj = Get-Printer -Name $pName -ErrorAction SilentlyContinue
+        if (-not $printerObj) {
+            Write-Log "Printer '$pName' is not installed locally. Skipping." "WARN"
+            $failCount++
+            continue
+        }
+
+        # Escape single quotes in printer name for WQL filter
+        $escapedName = $pName -replace "'", "''"
+
+        try {
+            $wmiPrinter = Get-CimInstance -ClassName Win32_Printer -Filter "Name='$escapedName'" -ErrorAction Stop
+            $result = Invoke-CimMethod -InputObject $wmiPrinter -MethodName "PrintTestPage" -ErrorAction Stop
+            if ($result.ReturnValue -eq 0) {
+                Write-Log "Test page dispatched to '$pName'." "SUCCESS"
+                $successCount++
+            } else {
+                Write-Log "PrintTestPage returned code $($result.ReturnValue) for '$pName'." "WARN"
+                $failCount++
+            }
+        } catch {
+            try {
+                Start-Process rundll32.exe -ArgumentList "printui.dll,PrintUIEntry /k /n `"$pName`"" -NoNewWindow -Wait
+                Write-Log "Test page dispatched via printui for '$pName'." "SUCCESS"
+                $successCount++
+            } catch {
+                Write-Log "Failed to send test page to '$pName': $_" "ERROR"
+                $failCount++
+            }
+        }
+    }
+
+    Write-Progress -Activity "Dispatching Test Pages" -Completed
+    Write-Host "`n─────────────────────────────────────────────────────────" -ForegroundColor DarkGray
+    Write-Log "Test pages dispatch process completed: $successCount dispatched, $failCount failed." "SUCCESS"
+    if (-not $FilePath) { Read-Host -Prompt "`nPress Enter to return to menu..." }
+
+    return @{ Total = $total; Success = $successCount; Failed = $failCount }
 }
 
 # Function to clear print queues
 function Clear-PrintQueues {
-    # Script title
-    Write-Host "Mass clearing of print queues"
-    
-    Stop-Service spooler
-    Remove-Item -Path $env:windir\system32\spool\PRINTERS\*.*
+    param (
+        [switch]$Force
+    )
 
-    $start = Start-Service Spooler -ErrorAction Ignore
+    Write-Host "`n════════════════ [4. CLEAR PRINT QUEUES] ════════════════" -ForegroundColor Yellow
+    Write-Log "This operation will stop the Spooler service and purge all pending jobs." "WARN"
 
-    if ((Get-Service spooler).status -eq 'Stopped') {
-        Start-Service Spooler -ErrorAction Ignore
+    if (-not $Force) {
+        $confirm = Read-Host "`nAre you sure you want to stop Spooler and clear queues? (Y/N)"
+        if ($confirm -notmatch '^(y|s|yes|si)$') {
+            Write-Log "Print queue clearing cancelled." "INFO"
+            Read-Host -Prompt "`nPress Enter to return to menu..."
+            return $false
+        }
     }
-    # Shows that the printer queue have been cleared.
-    Read-Host -Prompt "Print queue cleared successfully! Press any key to exit..."
+
+    try {
+        Write-Log "Stopping Spooler service..." "INFO"
+        Stop-Service -Name Spooler -Force -ErrorAction Stop
+
+        $spooler = Get-Service -Name Spooler
+        $timeout = 10
+        while ($spooler.Status -ne 'Stopped' -and $timeout -gt 0) {
+            Start-Sleep -Milliseconds 500
+            $spooler.Refresh()
+            $timeout--
+        }
+
+        # Extra 1s wait to ensure file handles release
+        Start-Sleep -Seconds 1
+
+        Write-Log "Purging spool files from system directory..." "INFO"
+        Remove-Item -Path "$env:windir\System32\spool\PRINTERS\*" -Force -Recurse -ErrorAction SilentlyContinue
+
+        Write-Log "Restarting Spooler service..." "INFO"
+        Start-Service -Name Spooler -ErrorAction Stop
+
+        Write-Log "Print queues cleared and Spooler restarted successfully!" "SUCCESS"
+        if (-not $Force) { Read-Host -Prompt "`nPress Enter to return to menu..." }
+        return $true
+    } catch {
+        Write-Log "Error while clearing print queues: $_" "ERROR"
+        if (-not $Force) { Read-Host -Prompt "`nPress Enter to return to menu..." }
+        return $false
+    }
 }
 
 # Function to inventory printers
 function Inventory-Printers {
-    # Script title
-    Write-Host "Inventorying printers..."
+    param (
+        [string]$OutputPath = ".\inventory.csv",
+        [switch]$NoGrid
+    )
 
-    # Logic to inventory printers
-    Get-WmiObject -class win32_printer -ComputerName $env:COMPUTERNAME | Select Caption,PortName,DriverName,PrinterStatus | Export-Csv -Path .\inventory.csv -Delimiter ';' -NoTypeInformation
-    
-    # Shows that all the printers have been inventoried.
-    Read-Host -Prompt "Printers inventoried successfully! Press any key to exit..."
+    Write-Host "`n═══════════════ [5. INVENTORY PRINTERS] ═══════════════" -ForegroundColor Yellow
+    Write-Host "Export destination: $OutputPath" -ForegroundColor DarkGray
+
+    try {
+        Write-Log "Gathering system printer information..." "INFO"
+        $printers = Get-CimInstance -ClassName Win32_Printer | Select-Object Name, DriverName, PortName, ShareName, Published, PrinterStatus, Default, Location, Comment
+
+        $printers | Export-Csv -Path $OutputPath -Delimiter ';' -NoTypeInformation -Encoding UTF8 -ErrorAction Stop
+        Write-Log "Inventory exported successfully to '$OutputPath' ($($printers.Count) printers found)." "SUCCESS"
+
+        # Show in GridView if requested and GUI is available
+        if (-not $NoGrid) {
+            try {
+                Write-Host "`nOpening interactive visual table..." -ForegroundColor DarkGray
+                $printers | Out-GridView -Title "Installed Printers Inventory ($($printers.Count) total)"
+            } catch {
+                Write-Log "GridView display skipped (GUI unavailable or running headless)." "INFO"
+            }
+        }
+        return $printers
+    } catch {
+        Write-Log "Error generating printer inventory: $_" "ERROR"
+        return $null
+    } finally {
+        if (-not $NoGrid) { Read-Host -Prompt "`nPress Enter to return to menu..." }
+    }
 }
 
-# Main menu
-Write-Host "1. Add Printers"
-Write-Host "2. Remove Printers"
-Write-Host "3. Send Test Pages"
-Write-Host "4. Clear Print Queue"
-Write-Host "5. Inventory Printers"
-Write-Host "6. Exit"
-# Validate user's option
-do {
-    $option = Read-Host "Choose an option (1-6)"
-    if ($option -notmatch '^[1-6]$') {
-        Write-Warning "Please enter a valid option (1-6)."
-    }
-} until ($option -match '^[1-6]$')
+# Function to generate CSV template
+function New-PrinterTemplateCsv {
+    param (
+        [string]$OutputPath = ".\template_printers.csv",
+        [switch]$NoOpen
+    )
 
-switch ($option) {
-    "1" {
-        # Call Add-Printers function
-        Add-Printers
-    }
-    "2" {
-        # Call Remove-Printers function
-        Remove-Printers
-    }
-    "3" {
-        # Call Send-TestPages function
-        Send-TestPages
-    }
-    "4" {
-        # Call Clear-PrintQueues function
-        Clear-PrintQueues
-    }
-    "5" {
-        # Call Inventory-Printers function
-        Inventory-Printers
-    }
-    "6" {
-        # Exit the program
-        break
-    }
+    Write-Host "`n═════════════ [6. GENERATE CSV TEMPLATE] ═════════════" -ForegroundColor Yellow
 
-    default {
-        Write-Host "Invalid option"
+    $sampleData = @"
+Name;LocalPort;DriverName
+Office_HP_LaserJet;192.168.1.50;HP Universal Printing PCL 6
+Finance_Canon_MFP;\\printserver01\Canon_Finance;Canon Generic Plus PCL6
+Warehouse_Zebra_Labels;USB001;ZDesigner ZD420-203dpi ZPL
+HR_Epson_WorkForce;192.168.1.55;EPSON WF-C5790 Series
+"@
+
+    try {
+        Set-Content -Path $OutputPath -Value $sampleData -Encoding UTF8 -ErrorAction Stop
+        Write-Log "Template CSV created successfully at: $OutputPath" "SUCCESS"
+        Write-Host "`nSample content generated:" -ForegroundColor Cyan
+        Write-Host $sampleData -ForegroundColor DarkGray
+
+        if (-not $NoOpen) {
+            $open = Read-Host "`nDo you want to open the generated CSV file now? (Y/N)"
+            if ($open -match '^(y|s|yes|si)$') {
+                try { Invoke-Item $OutputPath } catch { }
+            }
+        }
+        return $OutputPath
+    } catch {
+        Write-Log "Error creating template CSV: $_" "ERROR"
+        return $null
+    } finally {
+        if (-not $NoOpen) { Read-Host -Prompt "`nPress Enter to return to menu..." }
     }
 }
+
+# Function to view activity log
+function Show-ActivityLog {
+    param (
+        [string]$LogPath = $script:LogFile,
+        [int]$Tail = 25
+    )
+
+    Write-Host "`n════════════════ [7. VIEW ACTIVITY LOG] ════════════════" -ForegroundColor Yellow
+
+    if (Test-Path -Path $LogPath) {
+        Write-Host "Log location: $LogPath`n" -ForegroundColor DarkGray
+        Get-Content -Path $LogPath -Tail $Tail | ForEach-Object {
+            if ($_ -match "\[SUCCESS\]") { Write-Host $_ -ForegroundColor Green }
+            elseif ($_ -match "\[ERROR\]") { Write-Host $_ -ForegroundColor Red }
+            elseif ($_ -match "\[WARN\]") { Write-Host $_ -ForegroundColor Yellow }
+            else { Write-Host $_ -ForegroundColor Cyan }
+        }
+
+        $open = Read-Host "`nOpen full log file in default editor? (Y/N)"
+        if ($open -match '^(y|s|yes|si)$') {
+            try { Invoke-Item $LogPath } catch { }
+        }
+    } else {
+        Write-Log "No activity log file found yet." "INFO"
+        Read-Host -Prompt "`nPress Enter to return to menu..."
+    }
+}
+
+# Main application interactive loop (only executed if run directly, not dot-sourced in tests)
+if ($MyInvocation.InvocationName -ne '.' -and -not $env:PRINTER_MANAGEMENT_TESTING) {
+    # Check for Administrator privileges
+    $isAdmin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
+    if (-not $isAdmin) {
+        Write-Host "`n[!] ERROR: This script requires administrator privileges." -ForegroundColor Red
+        Write-Host "Please right-click PowerShell and select 'Run as Administrator'.`n" -ForegroundColor Yellow
+        Read-Host -Prompt "Press Enter to exit..."
+        exit
+    }
+
+    do {
+        Show-Banner
+
+        Write-Host " 1. 📥 Add Printers (Bulk CSV / TCP-IP / Shared UNC)"
+        Write-Host " 2. 🗑️  Remove Printers (CSV or Interactive GUI Selection)"
+        Write-Host " 3. 📄 Send Test Pages (Bulk CSV)"
+        Write-Host " 4. 🧹 Clear Print Queue (Purge Spooler)"
+        Write-Host " 5. 📊 Inventory Printers (CSV Export & GUI GridView)"
+        Write-Host " 6. 📝 Generate CSV Template"
+        Write-Host " 7. 📜 View Activity Log"
+        Write-Host " 8. 🚪 Exit"
+
+        $option = Read-Host "`nSelect an option (1-8)"
+
+        switch ($option) {
+            "1" { Add-Printers }
+            "2" { Remove-Printers }
+            "3" { Send-TestPages }
+            "4" { Clear-PrintQueues }
+            "5" { Inventory-Printers }
+            "6" { New-PrinterTemplateCsv }
+            "7" { Show-ActivityLog }
+            "8" {
+                Write-Host "`nExiting PrinterManagement. Goodbye!`n" -ForegroundColor Cyan
+            }
+            default {
+                Write-Warning "Invalid option. Please choose a number between 1 and 8."
+                Start-Sleep -Seconds 1
+            }
+        }
+    } while ($option -ne "8")
+}
+
