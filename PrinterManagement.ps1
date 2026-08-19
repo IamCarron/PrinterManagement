@@ -1,4 +1,4 @@
-﻿<#
+<#
 .SYNOPSIS
     Advanced Printer Management Tool for Windows Environments.
 .DESCRIPTION
@@ -16,7 +16,7 @@ try {
 }
 
 # Configuration
-$script:LogFile = Join-Path -Path (if ($PSScriptRoot) { $PSScriptRoot } else { "." }) -ChildPath "PrinterManagement.log"
+$script:LogFile = Join-Path -Path $(if ($PSScriptRoot) { $PSScriptRoot } else { "." }) -ChildPath "PrinterManagement.log"
 
 # Logging function
 function Write-Log {
