@@ -12,11 +12,28 @@ BeforeAll {
     $script:ScriptPath = Join-Path -Path $PSScriptRoot -ChildPath "..\PrinterManagement.ps1"
     $env:PRINTER_MANAGEMENT_TESTING = "true"
 
+    # Try to import Windows PrintManagement module if available
+    try {
+        Import-Module PrintManagement -ErrorAction SilentlyContinue
+    } catch { }
+
+    # Define stub commands for any PrintManagement cmdlets not pre-loaded in pwsh session
+    $stubCommands = @(
+        'Get-Printer', 'Add-Printer', 'Remove-Printer',
+        'Get-PrinterPort', 'Add-PrinterPort', 'Remove-PrinterPort',
+        'Get-PrinterDriver', 'Out-GridView'
+    )
+    foreach ($cmd in $stubCommands) {
+        if (-not (Get-Command -Name $cmd -ErrorAction SilentlyContinue)) {
+            Set-Item -Path "function:global:$cmd" -Value { }
+        }
+    }
+
     # Dot-source script functions into test scope
     . $script:ScriptPath
 
     # Create temporary directory for test artifacts
-    $script:TestTempDir = Join-Path -Path ([System.IO.Path]::GetTempPath()) -ChildPath "PrinterManagement_Tests_$((Get-Random))"
+    $script:TestTempDir = Join-Path -Path ([System.IO.Path]::GetTempPath()) -ChildPath "PM_Tests_$([System.Guid]::NewGuid().ToString('N'))"
     New-Item -ItemType Directory -Path $script:TestTempDir -Force | Out-Null
 }
 
