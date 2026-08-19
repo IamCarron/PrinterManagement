@@ -12,6 +12,7 @@ jobs:
     name: Unit Tests (${{ matrix.shell }})
     runs-on: windows-latest
     strategy:
+      fail-fast: false
       matrix:
         shell: [ powershell, pwsh ]
     defaults:

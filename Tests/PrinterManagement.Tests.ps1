@@ -8,6 +8,32 @@
     port creation logic, driver validation, WMI/CIM methods, and spooler purges.
 #>
 
+# Define mockable stub functions with full parameter signatures for PrintManagement module
+if (-not (Get-Command -Name Get-Printer -ErrorAction SilentlyContinue)) {
+    function global:Get-Printer { [CmdletBinding()] param([Parameter(Position=0)]$Name, $ErrorAction) }
+}
+if (-not (Get-Command -Name Add-Printer -ErrorAction SilentlyContinue)) {
+    function global:Add-Printer { [CmdletBinding()] param($Name, $PortName, $DriverName, $ConnectionName, $ErrorAction) }
+}
+if (-not (Get-Command -Name Remove-Printer -ErrorAction SilentlyContinue)) {
+    function global:Remove-Printer { [CmdletBinding()] param([Parameter(Position=0)]$Name, $ErrorAction) }
+}
+if (-not (Get-Command -Name Get-PrinterPort -ErrorAction SilentlyContinue)) {
+    function global:Get-PrinterPort { [CmdletBinding()] param([Parameter(Position=0)]$Name, $ErrorAction) }
+}
+if (-not (Get-Command -Name Add-PrinterPort -ErrorAction SilentlyContinue)) {
+    function global:Add-PrinterPort { [CmdletBinding()] param([Parameter(Position=0)]$Name, $PrinterHostAddress, $ErrorAction) }
+}
+if (-not (Get-Command -Name Remove-PrinterPort -ErrorAction SilentlyContinue)) {
+    function global:Remove-PrinterPort { [CmdletBinding()] param([Parameter(Position=0)]$Name, $ErrorAction) }
+}
+if (-not (Get-Command -Name Get-PrinterDriver -ErrorAction SilentlyContinue)) {
+    function global:Get-PrinterDriver { [CmdletBinding()] param([Parameter(Position=0)]$Name, $ErrorAction) }
+}
+if (-not (Get-Command -Name Out-GridView -ErrorAction SilentlyContinue)) {
+    function global:Out-GridView { [CmdletBinding()] param([Parameter(ValueFromPipeline)]$InputObject, $Title, [switch]$PassThru) }
+}
+
 BeforeAll {
     $script:ScriptPath = Join-Path -Path $PSScriptRoot -ChildPath "..\PrinterManagement.ps1"
     $env:PRINTER_MANAGEMENT_TESTING = "true"
@@ -16,18 +42,6 @@ BeforeAll {
     try {
         Import-Module PrintManagement -ErrorAction SilentlyContinue
     } catch { }
-
-    # Define stub commands for any PrintManagement cmdlets not pre-loaded in pwsh session
-    $stubCommands = @(
-        'Get-Printer', 'Add-Printer', 'Remove-Printer',
-        'Get-PrinterPort', 'Add-PrinterPort', 'Remove-PrinterPort',
-        'Get-PrinterDriver', 'Out-GridView'
-    )
-    foreach ($cmd in $stubCommands) {
-        if (-not (Get-Command -Name $cmd -ErrorAction SilentlyContinue)) {
-            Set-Item -Path "function:global:$cmd" -Value { }
-        }
-    }
 
     # Dot-source script functions into test scope
     . $script:ScriptPath
