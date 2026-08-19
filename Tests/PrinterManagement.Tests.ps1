@@ -37,25 +37,35 @@ if (-not (Get-Command -Name Out-GridView -ErrorAction SilentlyContinue)) {
 $env:PRINTER_MANAGEMENT_TEST_MODE = "true"
 
 BeforeAll {
-    $env:PRINTER_MANAGEMENT_TEST_MODE = "true"
-    $script:ScriptPath = Join-Path -Path $PSScriptRoot -ChildPath "..\PrinterManagement.ps1"
-
-    # Try to import Windows PrintManagement module if available
     try {
-        Import-Module PrintManagement -ErrorAction SilentlyContinue
-    } catch { }
+        $env:PRINTER_MANAGEMENT_TEST_MODE = "true"
+        $script:ScriptPath = Join-Path -Path $PSScriptRoot -ChildPath "..\PrinterManagement.ps1"
 
-    # Dot-source script functions into test scope
-    . $script:ScriptPath
+        # Try to import Windows PrintManagement module if available
+        try {
+            Import-Module PrintManagement -ErrorAction SilentlyContinue
+        } catch { }
 
-    # Create temporary directory for test artifacts
-    $script:TestTempDir = Join-Path -Path ([System.IO.Path]::GetTempPath()) -ChildPath "PM_Tests_$([System.Guid]::NewGuid().ToString('N'))"
-    New-Item -ItemType Directory -Path $script:TestTempDir -Force | Out-Null
+        # Dot-source script functions into test scope
+        try {
+            . $script:ScriptPath
+        } catch {
+            Write-Host "ERROR DOT-SOURCING PrinterManagement.ps1: $_" -ForegroundColor Red
+            throw
+        }
+
+        # Create temporary directory for test artifacts
+        $script:TestTempDir = Join-Path -Path ([System.IO.Path]::GetTempPath()) -ChildPath "PM_Tests_$([System.Guid]::NewGuid().ToString('N'))"
+        New-Item -ItemType Directory -Path $script:TestTempDir -Force | Out-Null
+    } catch {
+        Write-Host "CRITICAL ERROR IN BeforeAll: $_" -ForegroundColor Red
+        throw
+    }
 }
 
 AfterAll {
     $env:PRINTER_MANAGEMENT_TEST_MODE = $null
-    if (Test-Path -Path $script:TestTempDir) {
+    if ($null -ne $script:TestTempDir -and (Test-Path -Path $script:TestTempDir)) {
         Remove-Item -Path $script:TestTempDir -Recurse -Force -ErrorAction SilentlyContinue
     }
 }
