@@ -14,9 +14,9 @@ param (
 $testsPath = Join-Path -Path $PSScriptRoot -ChildPath "PrinterManagement.Tests.ps1"
 $scriptPath = Join-Path -Path $PSScriptRoot -ChildPath "..\PrinterManagement.ps1"
 
-Write-Host "═══════════════════════════════════════════════════════════" -ForegroundColor Cyan
+Write-Host "===========================================================" -ForegroundColor Cyan
 Write-Host "       PrinterManagement - Automated Test Suite Runner     " -ForegroundColor Cyan
-Write-Host "═══════════════════════════════════════════════════════════`n" -ForegroundColor Cyan
+Write-Host "===========================================================`n" -ForegroundColor Cyan
 
 # Check if Pester is installed
 $pesterModule = Get-Module -ListAvailable -Name Pester | Sort-Object Version -Descending | Select-Object -First 1
@@ -26,9 +26,9 @@ if (-not $pesterModule -or $pesterModule.Version.Major -lt 5) {
     try {
         Install-Module -Name Pester -MinimumVersion 5.3.0 -Scope CurrentUser -Force -SkipPublisherCheck -AllowClobber
         Import-Module Pester -MinimumVersion 5.3.0
-        Write-Host "[✓] Pester installed successfully." -ForegroundColor Green
+        Write-Host "[OK] Pester installed successfully." -ForegroundColor Green
     } catch {
-        Write-Host "[✗] Could not install Pester automatically: $_" -ForegroundColor Red
+        Write-Host "[FAIL] Could not install Pester automatically: $_" -ForegroundColor Red
         Write-Host "Please run: Install-Module -Name Pester -Scope CurrentUser" -ForegroundColor Yellow
         exit 1
     }
@@ -56,9 +56,9 @@ if ($CI) {
 # Run tests
 $result = Invoke-Pester -Configuration $pesterConfig
 
-Write-Host "`n═══════════════════════════════════════════════════════════" -ForegroundColor Cyan
+Write-Host "`n===========================================================" -ForegroundColor Cyan
 Write-Host "                   Test Execution Summary                  " -ForegroundColor Cyan
-Write-Host "═══════════════════════════════════════════════════════════" -ForegroundColor Cyan
+Write-Host "===========================================================" -ForegroundColor Cyan
 Write-Host "Total Tests: $($result.TotalCount)"
 Write-Host "Passed:      $($result.PassedCount)" -ForegroundColor Green
 Write-Host "Failed:      $($result.FailedCount)" -ForegroundColor $(if ($result.FailedCount -gt 0) { "Red" } else { "Green" })

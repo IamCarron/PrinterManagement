@@ -1,4 +1,4 @@
-#Requires -Module Pester
+﻿#Requires -Module Pester
 
 <#
 .SYNOPSIS
@@ -73,13 +73,12 @@ AfterAll {
 Describe "1. System Logging (Write-Log)" {
     It "Formats log message with timestamp and level icon" {
         $testLog = Join-Path -Path $script:TestTempDir -ChildPath "test_log.log"
-        $result = Write-Log -Message "Test message" -Level "SUCCESS" -CustomLogPath $testLog
+        Write-Log -Message "Test message" -Level "SUCCESS" -CustomLogPath $testLog
 
-        $result | Should -Match "\[\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\] \[SUCCESS\] Test message"
         Test-Path -Path $testLog | Should -BeTrue
 
         $fileContent = Get-Content -Path $testLog -Raw
-        $fileContent | Should -Match "Test message"
+        $fileContent | Should -Match "\[\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\] \[SUCCESS\] Test message"
     }
 
     It "Supports all defined log levels (INFO, SUCCESS, WARN, ERROR)" {

@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     Advanced Printer Management Tool for Windows Environments.
 .DESCRIPTION
@@ -42,9 +42,9 @@ function Write-Log {
 
     $iconMap = @{
         "INFO"    = "[i]"
-        "SUCCESS" = "[✓]"
+        "SUCCESS" = "[OK]"
         "WARN"    = "[!]"
-        "ERROR"   = "[✗]"
+        "ERROR"   = "[FAIL]"
     }
 
     Write-Host "$($iconMap[$Level]) $Message" -ForegroundColor $colorMap[$Level]
@@ -61,15 +61,15 @@ function Write-Log {
 function Show-Banner {
     Clear-Host
     Write-Host @'
- ╔════════════════════════════════════════════════════════════════════════════╗
- ║   ___      _      __          __  ___                                      ║
- ║  / _ \____(_)__  / /____ ____/  |/  /__ ____  ___ ____ ____ __ _  ___ ___  ║
- ║ / ___/ __/ / _ \/ __/ -_) __/ /|_/ / _ `/ _ \/ _ `/ _ `/ -_)  ' \/ -_) _ \ ║
- ║/_/  /_/ /_/_//_/\__/\__/_/ /_/  /_/\_,_/_//_/\_,_/\_, /\__/_/_/_/\__/_//_/ ║
- ║                                                  /___/                     ║
- ║                      Windows Printer Management Suite                      ║
- ║                                Version 3.1.0                               ║
- ╚════════════════════════════════════════════════════════════════════════════╝
+ +============================================================================+
+ |   ___      _      __          __  ___                                      |
+ |  / _ \____(_)__  / /____ ____/  |/  /__ ____  ___ ____ ____ __ _  ___ ___  |
+ | / ___/ __/ / _ \/ __/ -_) __/ /|_/ / _ `/ _ \/ _ `/ _ `/ -_)  ' \/ -_) _ \ |
+ |/_/  /_/ /_/_//_/\__/\__/_/ /_/  /_/\_,_/_//_/\_,_/\_, /\__/_/_/_/\__/_//_/ |
+ |                                                  /___/                     |
+ |                      Windows Printer Management Suite                      |
+ |                                Version 3.1.0                               |
+ +============================================================================+
 '@ -ForegroundColor Cyan
 }
 
@@ -91,8 +91,8 @@ function Get-ValidFilePath {
     }
 
     Write-Host "`nSelect CSV File:" -ForegroundColor Yellow
-    Write-Host "  • Press [Enter] to open GUI File Explorer" -ForegroundColor DarkGray
-    Write-Host "  • Or type / paste the file path directly" -ForegroundColor DarkGray
+    Write-Host "  - Press [Enter] to open GUI File Explorer" -ForegroundColor DarkGray
+    Write-Host "  - Or type / paste the file path directly" -ForegroundColor DarkGray
     $inputPath = Read-Host -Prompt "File path"
 
     if ([string]::IsNullOrWhiteSpace($inputPath)) {
@@ -189,7 +189,7 @@ function Add-Printers {
         [string]$FilePath = ""
     )
 
-    Write-Host "`n═══════════════════ [1. ADD PRINTERS] ═══════════════════" -ForegroundColor Yellow
+    Write-Host "`n=================== [1. ADD PRINTERS] ===================" -ForegroundColor Yellow
 
     $printersFile = Get-ValidFilePath -FilePath $FilePath -Title "Select CSV File to Add Printers"
     if (-not $printersFile) {
@@ -283,7 +283,7 @@ function Add-Printers {
     }
 
     Write-Progress -Activity "Installing Printers" -Completed
-    Write-Host "`n─────────────────────────────────────────────────────────" -ForegroundColor DarkGray
+    Write-Host "`n---------------------------------------------------------" -ForegroundColor DarkGray
     Write-Log "Finished: $successCount installed successfully, $failCount failed." $(if ($failCount -eq 0) { "SUCCESS" } else { "WARN" })
     if (-not $FilePath) { Read-Host -Prompt "`nPress Enter to return to menu..." }
 
@@ -298,7 +298,7 @@ function Remove-Printers {
         [switch]$Force
     )
 
-    Write-Host "`n══════════════════ [2. REMOVE PRINTERS] ══════════════════" -ForegroundColor Yellow
+    Write-Host "`n================== [2. REMOVE PRINTERS] ==================" -ForegroundColor Yellow
 
     $printersToRemove = @()
 
@@ -400,7 +400,7 @@ function Remove-Printers {
     }
 
     Write-Progress -Activity "Removing Printers" -Completed
-    Write-Host "`n─────────────────────────────────────────────────────────" -ForegroundColor DarkGray
+    Write-Host "`n---------------------------------------------------------" -ForegroundColor DarkGray
     Write-Log "Removal process completed. Processed: $total printer(s)." "SUCCESS"
     if (-not $Force) { Read-Host -Prompt "`nPress Enter to return to menu..." }
 
@@ -414,7 +414,7 @@ function Send-TestPages {
         [array]$PrinterList = @()
     )
 
-    Write-Host "`n═════════════════ [3. SEND TEST PAGES] ═════════════════" -ForegroundColor Yellow
+    Write-Host "`n================= [3. SEND TEST PAGES] =================" -ForegroundColor Yellow
 
     $printersToTest = @()
     if ($PrinterList -and $PrinterList.Count -gt 0) {
@@ -481,7 +481,7 @@ function Send-TestPages {
     }
 
     Write-Progress -Activity "Dispatching Test Pages" -Completed
-    Write-Host "`n─────────────────────────────────────────────────────────" -ForegroundColor DarkGray
+    Write-Host "`n---------------------------------------------------------" -ForegroundColor DarkGray
     Write-Log "Test pages dispatch process completed: $successCount dispatched, $failCount failed." "SUCCESS"
     if (-not $FilePath) { Read-Host -Prompt "`nPress Enter to return to menu..." }
 
@@ -494,7 +494,7 @@ function Clear-PrintQueues {
         [switch]$Force
     )
 
-    Write-Host "`n════════════════ [4. CLEAR PRINT QUEUES] ════════════════" -ForegroundColor Yellow
+    Write-Host "`n================ [4. CLEAR PRINT QUEUES] ================" -ForegroundColor Yellow
     Write-Log "This operation will stop the Spooler service and purge all pending jobs." "WARN"
 
     if (-not $Force) {
@@ -544,7 +544,7 @@ function Inventory-Printers {
         [switch]$NoGrid
     )
 
-    Write-Host "`n═══════════════ [5. INVENTORY PRINTERS] ═══════════════" -ForegroundColor Yellow
+    Write-Host "`n=============== [5. INVENTORY PRINTERS] ===============" -ForegroundColor Yellow
     Write-Host "Export destination: $OutputPath" -ForegroundColor DarkGray
 
     try {
@@ -579,7 +579,7 @@ function New-PrinterTemplateCsv {
         [switch]$NoOpen
     )
 
-    Write-Host "`n═════════════ [6. GENERATE CSV TEMPLATE] ═════════════" -ForegroundColor Yellow
+    Write-Host "`n============= [6. GENERATE CSV TEMPLATE] =============" -ForegroundColor Yellow
 
     $sampleData = @"
 Name;LocalPort;DriverName
@@ -617,7 +617,7 @@ function Show-ActivityLog {
         [int]$Tail = 25
     )
 
-    Write-Host "`n════════════════ [7. VIEW ACTIVITY LOG] ════════════════" -ForegroundColor Yellow
+    Write-Host "`n================ [7. VIEW ACTIVITY LOG] ================" -ForegroundColor Yellow
 
     if (Test-Path -Path $LogPath) {
         Write-Host "Log location: $LogPath`n" -ForegroundColor DarkGray
@@ -655,14 +655,14 @@ function Start-PrinterManagement {
     do {
         Show-Banner
 
-        Write-Host " 1. 📥 Add Printers (Bulk CSV / TCP-IP / Shared UNC)"
-        Write-Host " 2. 🗑️  Remove Printers (CSV or Interactive GUI Selection)"
-        Write-Host " 3. 📄 Send Test Pages (Bulk CSV)"
-        Write-Host " 4. 🧹 Clear Print Queue (Purge Spooler)"
-        Write-Host " 5. 📊 Inventory Printers (CSV Export & GUI GridView)"
-        Write-Host " 6. 📝 Generate CSV Template"
-        Write-Host " 7. 📜 View Activity Log"
-        Write-Host " 8. 🚪 Exit"
+        Write-Host " 1.   Add Printers (Bulk CSV / TCP-IP / Shared UNC)"
+        Write-Host " 2.    Remove Printers (CSV or Interactive GUI Selection)"
+        Write-Host " 3.   Send Test Pages (Bulk CSV)"
+        Write-Host " 4.   Clear Print Queue (Purge Spooler)"
+        Write-Host " 5.   Inventory Printers (CSV Export & GUI GridView)"
+        Write-Host " 6.   Generate CSV Template"
+        Write-Host " 7.   View Activity Log"
+        Write-Host " 8.   Exit"
 
         $option = Read-Host "`nSelect an option (1-8)"
 
