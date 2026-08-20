@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     Advanced Printer Management Tool for Windows Environments.
 .DESCRIPTION
@@ -189,7 +189,7 @@ function Add-Printers {
         [string]$FilePath = ""
     )
 
-    Write-Host "`n=================== [1. ADD PRINTERS] ===================" -ForegroundColor Yellow
+    Write-Host "`n=========================== [ 1. ADD PRINTERS ] ===========================" -ForegroundColor Yellow
 
     $printersFile = Get-ValidFilePath -FilePath $FilePath -Title "Select CSV File to Add Printers"
     if (-not $printersFile) {
@@ -298,7 +298,7 @@ function Remove-Printers {
         [switch]$Force
     )
 
-    Write-Host "`n================== [2. REMOVE PRINTERS] ==================" -ForegroundColor Yellow
+    Write-Host "`n========================= [ 2. REMOVE PRINTERS ] =========================" -ForegroundColor Yellow
 
     $printersToRemove = @()
 
@@ -307,10 +307,10 @@ function Remove-Printers {
     } elseif (-not [string]::IsNullOrWhiteSpace($FilePath)) {
         $printersToRemove = @(Import-SmartCsv -Path $FilePath)
     } else {
-        Write-Host "1. Remove printers specified in CSV"
-        Write-Host "2. Select printers interactively from GUI list"
-        Write-Host "3. Cancel"
-        $subOption = Read-Host "`nChoose an option (1-3)"
+        Write-Host " [1] Remove printers specified in CSV" -ForegroundColor Cyan
+        Write-Host " [2] Select printers interactively from GUI list" -ForegroundColor Cyan
+        Write-Host " [3] Cancel" -ForegroundColor DarkGray
+        $subOption = Read-Host "`nSelect an option (1-3)"
 
         if ($subOption -eq "1") {
             $printersFile = Get-ValidFilePath -Title "Select CSV File to Remove Printers"
@@ -414,7 +414,7 @@ function Send-TestPages {
         [array]$PrinterList = @()
     )
 
-    Write-Host "`n================= [3. SEND TEST PAGES] =================" -ForegroundColor Yellow
+    Write-Host "`n======================= [ 3. SEND TEST PAGES ] =======================" -ForegroundColor Yellow
 
     $printersToTest = @()
     if ($PrinterList -and $PrinterList.Count -gt 0) {
@@ -494,7 +494,7 @@ function Clear-PrintQueues {
         [switch]$Force
     )
 
-    Write-Host "`n================ [4. CLEAR PRINT QUEUES] ================" -ForegroundColor Yellow
+    Write-Host "`n====================== [ 4. CLEAR PRINT QUEUES ] ======================" -ForegroundColor Yellow
     Write-Log "This operation will stop the Spooler service and purge all pending jobs." "WARN"
 
     if (-not $Force) {
@@ -541,34 +541,40 @@ function Clear-PrintQueues {
 function Inventory-Printers {
     param (
         [string]$OutputPath = ".\inventory.csv",
-        [switch]$NoGrid
+        [switch]$NoGrid,
+        [switch]$NoPrompt
     )
 
-    Write-Host "`n=============== [5. INVENTORY PRINTERS] ===============" -ForegroundColor Yellow
-    Write-Host "Export destination: $OutputPath" -ForegroundColor DarkGray
+    Write-Host "`n===================== [ 5. INVENTORY PRINTERS ] =====================" -ForegroundColor Yellow
 
     try {
         Write-Log "Gathering system printer information..." "INFO"
-        $printers = Get-CimInstance -ClassName Win32_Printer | Select-Object Name, DriverName, PortName, ShareName, Published, PrinterStatus, Default, Location, Comment
+        $printers = @(Get-CimInstance -ClassName Win32_Printer | Select-Object Name, DriverName, PortName, ShareName, Published, PrinterStatus, Default, Location, Comment)
 
-        $printers | Export-Csv -Path $OutputPath -Delimiter ';' -NoTypeInformation -Encoding UTF8 -ErrorAction Stop
-        Write-Log "Inventory exported successfully to '$OutputPath' ($($printers.Count) printers found)." "SUCCESS"
-
-        # Show in GridView if requested and GUI is available
-        if (-not $NoGrid) {
-            try {
-                Write-Host "`nOpening interactive visual table..." -ForegroundColor DarkGray
-                $printers | Out-GridView -Title "Installed Printers Inventory ($($printers.Count) total)"
-            } catch {
-                Write-Log "GridView display skipped (GUI unavailable or running headless)." "INFO"
-            }
+        if (-not $printers -or $printers.Count -eq 0) {
+            Write-Log "No installed printers found on this system." "WARN"
+            if (-not $NoGrid -and -not $NoPrompt) { Read-Host -Prompt "`nPress Enter to return to menu..." }
+            return @()
         }
+
+        # Export to CSV
+        $printers | Export-Csv -Path $OutputPath -Delimiter ';' -NoTypeInformation -Encoding UTF8 -ErrorAction Stop
+        Write-Log "Inventory exported to '$OutputPath' ($($printers.Count) printer(s) found)." "SUCCESS"
+
+        # Format and display clean console table
+        Write-Host "`nInstalled Printers on this System:" -ForegroundColor Cyan
+        $displayData = $printers | Select-Object @{Name="Printer Name"; Expression={$_.Name}},
+                                                 @{Name="Port"; Expression={$_.PortName}},
+                                                 @{Name="Driver"; Expression={$_.DriverName}},
+                                                 @{Name="Default"; Expression={if ($_.Default) { "YES" } else { "No" }}}
+        $displayData | Format-Table -AutoSize | Out-String | Write-Host
+
         return $printers
     } catch {
         Write-Log "Error generating printer inventory: $_" "ERROR"
         return $null
     } finally {
-        if (-not $NoGrid) { Read-Host -Prompt "`nPress Enter to return to menu..." }
+        if (-not $NoGrid -and -not $NoPrompt) { Read-Host -Prompt "`nPress Enter to return to menu..." }
     }
 }
 
@@ -579,7 +585,7 @@ function New-PrinterTemplateCsv {
         [switch]$NoOpen
     )
 
-    Write-Host "`n============= [6. GENERATE CSV TEMPLATE] =============" -ForegroundColor Yellow
+    Write-Host "`n==================== [ 6. GENERATE CSV TEMPLATE ] ====================" -ForegroundColor Yellow
 
     $sampleData = @"
 Name;LocalPort;DriverName
@@ -617,7 +623,7 @@ function Show-ActivityLog {
         [int]$Tail = 25
     )
 
-    Write-Host "`n================ [7. VIEW ACTIVITY LOG] ================" -ForegroundColor Yellow
+    Write-Host "`n======================= [ 7. VIEW ACTIVITY LOG ] =======================" -ForegroundColor Yellow
 
     if (Test-Path -Path $LogPath) {
         Write-Host "Log location: $LogPath`n" -ForegroundColor DarkGray
@@ -655,16 +661,17 @@ function Start-PrinterManagement {
     do {
         Show-Banner
 
-        Write-Host " 1.   Add Printers (Bulk CSV / TCP-IP / Shared UNC)"
-        Write-Host " 2.    Remove Printers (CSV or Interactive GUI Selection)"
-        Write-Host " 3.   Send Test Pages (Bulk CSV)"
-        Write-Host " 4.   Clear Print Queue (Purge Spooler)"
-        Write-Host " 5.   Inventory Printers (CSV Export & GUI GridView)"
-        Write-Host " 6.   Generate CSV Template"
-        Write-Host " 7.   View Activity Log"
-        Write-Host " 8.   Exit"
+        Write-Host " [1] Add Printers (Bulk CSV / TCP-IP / Shared UNC)" -ForegroundColor Cyan
+        Write-Host " [2] Remove Printers (CSV or Interactive List Selection)" -ForegroundColor Cyan
+        Write-Host " [3] Send Test Pages (Bulk CSV)" -ForegroundColor Cyan
+        Write-Host " [4] Clear Print Queue (Purge Spooler)" -ForegroundColor Cyan
+        Write-Host " [5] Inventory Printers (Console Table & CSV Export)" -ForegroundColor Cyan
+        Write-Host " [6] Generate CSV Template" -ForegroundColor Cyan
+        Write-Host " [7] View Activity Log" -ForegroundColor Cyan
+        Write-Host " [8] Exit" -ForegroundColor Yellow
+        Write-Host ""
 
-        $option = Read-Host "`nSelect an option (1-8)"
+        $option = Read-Host "Select an option (1-8)"
 
         switch ($option) {
             "1" { Add-Printers }

@@ -31,7 +31,7 @@ Automated, robust, and enterprise-grade PowerShell automation suite for managing
 - 🗑️ **Dual-Mode Printer Removal:** Remove printers in bulk via CSV lists or interactively using a native Windows `Out-GridView` selection dialog with multi-select support (`Ctrl` / `Shift`).
 - 📄 **Automated Test Page Dispatch:** Send hardware test prints via CIM/WMI methods (`Win32_Printer.PrintTestPage()`) with automatic fallback to native Windows `printui.dll`.
 - 🧹 **Safe Spooler Queue Purge:** Stops the `Spooler` service cleanly, verifies process termination and file lock releases, clears corrupted print jobs (`.SHD` / `.SPL`), and restarts the Spooler service.
-- 📊 **Real-Time Inventory & GridView Inspection:** Collects system-wide printer data using modern CIM cmdlets, exports directly to UTF-8 CSV (`inventory.csv`), and presents an interactive, searchable visual table.
+- 📊 **Real-Time Inventory & Console Table Inspection:** Collects system-wide printer data using modern CIM cmdlets, displays an organized, clean table directly in the terminal, and exports to UTF-8 CSV (`inventory.csv`).
 - 🗂️ **Hybrid GUI / CLI File Picker:** Open native Windows Explorer dialogs by pressing `[Enter]` or type/paste file paths directly in the console.
 - 🛡️ **Smart Delimiter & Header Parser:** Auto-detects delimiters (Semicolon `;`, Comma `,`, or Tab `\t`) and normalizes varied column names (`Driver`/`DriverName`, `Port`/`LocalPort`, `Name`/`PrinterName`).
 - 📈 **Native Progress Bars:** Integrated `Write-Progress` tracking provides visual percentage and status updates during batch installations and test page dispatching.
@@ -53,14 +53,14 @@ Automated, robust, and enterprise-grade PowerShell automation suite for managing
  |                                Version 3.1.0                               |
  +============================================================================+
 
- 1.   Add Printers (Bulk CSV / TCP-IP / Shared UNC)
- 2.   Remove Printers (CSV or Interactive GUI Selection)
- 3.   Send Test Pages (Bulk CSV)
- 4.   Clear Print Queue (Purge Spooler)
- 5.   Inventory Printers (CSV Export & GUI GridView)
- 6.   Generate CSV Template
- 7.   View Activity Log
- 8.   Exit
+ [1] Add Printers (Bulk CSV / TCP-IP / Shared UNC)
+ [2] Remove Printers (CSV or Interactive List Selection)
+ [3] Send Test Pages (Bulk CSV)
+ [4] Clear Print Queue (Purge Spooler)
+ [5] Inventory Printers (Console Table & CSV Export)
+ [6] Generate CSV Template
+ [7] View Activity Log
+ [8] Exit
 ```
 
 ---
