@@ -5,7 +5,7 @@
     Automates printer installation, removal, test page dispatch, spooler cleanup,
     and inventorying with interactive TUI, GUI dialogs, logs, and progress reporting.
 .VERSION
-    3.1.0
+    3.2.0
 #>
 
 # Load Windows Forms for GUI dialogs if available
@@ -17,6 +17,80 @@ try {
 
 # Configuration
 $script:LogFile = Join-Path -Path $(if ($PSScriptRoot) { $PSScriptRoot } else { "." }) -ChildPath "PrinterManagement.log"
+
+# Localization
+$script:Strings = @{
+    'en' = @{
+        'AdminError'        = "[!] ERROR: This script requires administrator privileges."
+        'AdminPrompt'       = "Please right-click PowerShell and select 'Run as Administrator'."
+        'PressEnterToExit'  = "Press Enter to exit..."
+        'CatOperations'     = "OPERATIONS "
+        'OptAddPrinters'    = "      [1]  Add Printers"
+        'DescAddPrinters'   = "         Bulk CSV / TCP-IP / Shared UNC"
+        'OptRemPrinters'    = "      [2]  Remove Printers"
+        'DescRemPrinters'   = "      CSV or interactive selection"
+        'CatDiagnostics'    = "DIAGNOSTICS "
+        'OptSendTest'       = "      [3]  Send Test Pages"
+        'DescSendTest'      = "     CIM dispatch with printui fallback"
+        'OptClearQueue'     = "      [4]  Clear Print Queue"
+        'DescClearQueue'    = "   Purge Spooler & restart service"
+        'CatSystem'         = "SYSTEM "
+        'OptInventory'      = "      [5]  Inventory Printers"
+        'DescInventory'     = "  Console table & CSV export"
+        'OptViewLog'        = "      [6]  View Activity Log"
+        'DescViewLog'       = "   Review recent operations"
+        'OptExit'           = "      [0]  Exit"
+        'MadeWith'          = "                         Made with "
+        'By'                = " by "
+        'SelectOption'      = "   Select an option (0-6)"
+        'Disconnecting'     = "   Disconnecting from PrinterManagement..."
+        'SessionTerminated' = "   Session terminated. Goodbye!"
+        'InvalidOption'     = "   Invalid option. Please choose a number between 0 and 6."
+        'HeaderAdd'         = "`n=========================== [ 1. ADD PRINTERS ] ==========================="
+        'HeaderRem'         = "`n========================= [ 2. REMOVE PRINTERS ] ========================="
+        'HeaderTest'        = "`n======================= [ 3. SEND TEST PAGES ] ======================="
+        'HeaderClear'       = "`n====================== [ 4. CLEAR PRINT QUEUES ] ======================"
+        'HeaderInv'         = "`n===================== [ 5. INVENTORY PRINTERS ] ====================="
+        'HeaderLog'         = "`n======================= [ 6. VIEW ACTIVITY LOG ] ======================="
+    }
+    'es' = @{
+        'AdminError'        = "[!] ERROR: Este script requiere privilegios de administrador."
+        'AdminPrompt'       = "Por favor, haz clic derecho en PowerShell y selecciona 'Ejecutar como Administrador'."
+        'PressEnterToExit'  = "Presiona Enter para salir..."
+        'CatOperations'     = "OPERACIONES "
+        'OptAddPrinters'    = "      [1]  Agregar Impresoras"
+        'DescAddPrinters'   = "         CSV Masivo / TCP-IP / Red UNC"
+        'OptRemPrinters'    = "      [2]  Eliminar Impresoras"
+        'DescRemPrinters'   = "      CSV o seleccion interactiva"
+        'CatDiagnostics'    = "DIAGNOSTICO "
+        'OptSendTest'       = "      [3]  Enviar Pagina de Prueba"
+        'DescSendTest'      = "     Envio CIM con printui alternativo"
+        'OptClearQueue'     = "      [4]  Limpiar Cola de Impresion"
+        'DescClearQueue'    = "   Purgar Spooler y reiniciar servicio"
+        'CatSystem'         = "SISTEMA "
+        'OptInventory'      = "      [5]  Inventario de Impresoras"
+        'DescInventory'     = "  Tabla en consola y exportacion CSV"
+        'OptViewLog'        = "      [6]  Ver Registro de Actividad"
+        'DescViewLog'       = "   Revisar las operaciones recientes"
+        'OptExit'           = "      [0]  Salir"
+        'MadeWith'          = "                         Hecho con "
+        'By'                = " por "
+        'SelectOption'      = "   Selecciona una opcion (0-6)"
+        'Disconnecting'     = "   Desconectando de PrinterManagement..."
+        'SessionTerminated' = "   Sesion terminada. Adios!"
+        'InvalidOption'     = "   Opcion invalida. Por favor elige un numero entre 0 y 6."
+        'HeaderAdd'         = "`n======================== [ 1. AGREGAR IMPRESORAS ] ========================"
+        'HeaderRem'         = "`n======================= [ 2. ELIMINAR IMPRESORAS ] ========================"
+        'HeaderTest'        = "`n====================== [ 3. ENVIAR PAGINA DE PRUEBA ] ====================="
+        'HeaderClear'       = "`n====================== [ 4. LIMPIAR COLA DE IMPRESION ] ==================="
+        'HeaderInv'         = "`n====================== [ 5. INVENTARIO DE IMPRESORAS ] ===================="
+        'HeaderLog'         = "`n====================== [ 6. VER REGISTRO DE ACTIVIDAD ] ======================"
+    }
+}
+
+$lang = (Get-UICulture).TwoLetterISOLanguageName
+if (-not $script:Strings.ContainsKey($lang)) { $lang = 'en' }
+$script:T = $script:Strings[$lang]
 
 # Logging function
 function Write-Log {
@@ -60,17 +134,20 @@ function Write-Log {
 # Function to display banner
 function Show-Banner {
     Clear-Host
-    Write-Host @'
- +============================================================================+
- |   ___      _      __          __  ___                                      |
- |  / _ \____(_)__  / /____ ____/  |/  /__ ____  ___ ____ ____ __ _  ___ ___  |
- | / ___/ __/ / _ \/ __/ -_) __/ /|_/ / _ `/ _ \/ _ `/ _ `/ -_)  ' \/ -_) _ \ |
- |/_/  /_/ /_/_//_/\__/\__/_/ /_/  /_/\_,_/_//_/\_,_/\_, /\__/_/_/_/\__/_//_/ |
- |                                                  /___/                     |
- |                      Windows Printer Management Suite                      |
- |                                Version 3.1.0                               |
- +============================================================================+
-'@ -ForegroundColor Cyan
+    Write-Host ""
+    Write-Host "  ===========================================================================" -ForegroundColor DarkCyan
+    Write-Host "    ___      _      __          __  ___                                      " -ForegroundColor Cyan
+    Write-Host "   / _ \____(_)__  / /____ ____/  |/  /__ ____  ___ ____ ____ __ _  ___ ___  " -ForegroundColor Cyan
+    Write-Host "  / ___/ __/ / _ \/ __/ -_) __/ /|_/ / _ ``/ _ \/ _ ``/ _ ``/ -_)  ' \/ -_) _ \ " -ForegroundColor Cyan
+    Write-Host " /_/  /_/ /_/_//_/\__/\__/_/ /_/  /_/\_,_/_//_/\_,_/\_, /\__/_/_/_/\__/_//_/ " -ForegroundColor Cyan
+    Write-Host "                                                    /___/                    " -ForegroundColor Cyan
+    Write-Host "  ===========================================================================" -ForegroundColor DarkCyan
+    Write-Host "   v3.2.0" -ForegroundColor DarkGray -NoNewline
+    Write-Host " | " -ForegroundColor DarkCyan -NoNewline
+    Write-Host "Windows Printer Management Suite" -ForegroundColor White
+    Write-Host "   github.com/IamCarron/PrinterManagement" -ForegroundColor DarkGray
+    Write-Host "  ===========================================================================" -ForegroundColor DarkCyan
+    Write-Host ""
 }
 
 # GUI & CLI File Picker
@@ -189,7 +266,7 @@ function Add-Printers {
         [string]$FilePath = ""
     )
 
-    Write-Host "`n=========================== [ 1. ADD PRINTERS ] ===========================" -ForegroundColor Yellow
+    Write-Host $script:T.HeaderAdd -ForegroundColor Yellow
 
     $printersFile = Get-ValidFilePath -FilePath $FilePath -Title "Select CSV File to Add Printers"
     if (-not $printersFile) {
@@ -298,7 +375,7 @@ function Remove-Printers {
         [switch]$Force
     )
 
-    Write-Host "`n========================= [ 2. REMOVE PRINTERS ] =========================" -ForegroundColor Yellow
+    Write-Host $script:T.HeaderRem -ForegroundColor Yellow
 
     $printersToRemove = @()
 
@@ -414,7 +491,7 @@ function Send-TestPages {
         [array]$PrinterList = @()
     )
 
-    Write-Host "`n======================= [ 3. SEND TEST PAGES ] =======================" -ForegroundColor Yellow
+    Write-Host $script:T.HeaderTest -ForegroundColor Yellow
 
     $printersToTest = @()
     if ($PrinterList -and $PrinterList.Count -gt 0) {
@@ -494,7 +571,7 @@ function Clear-PrintQueues {
         [switch]$Force
     )
 
-    Write-Host "`n====================== [ 4. CLEAR PRINT QUEUES ] ======================" -ForegroundColor Yellow
+    Write-Host $script:T.HeaderClear -ForegroundColor Yellow
     Write-Log "This operation will stop the Spooler service and purge all pending jobs." "WARN"
 
     if (-not $Force) {
@@ -545,7 +622,7 @@ function Inventory-Printers {
         [switch]$NoPrompt
     )
 
-    Write-Host "`n===================== [ 5. INVENTORY PRINTERS ] =====================" -ForegroundColor Yellow
+    Write-Host $script:T.HeaderInv -ForegroundColor Yellow
 
     try {
         Write-Log "Gathering system printer information..." "INFO"
@@ -623,7 +700,7 @@ function Show-ActivityLog {
         [int]$Tail = 25
     )
 
-    Write-Host "`n======================= [ 7. VIEW ACTIVITY LOG ] =======================" -ForegroundColor Yellow
+    Write-Host $script:T.HeaderLog -ForegroundColor Yellow
 
     if (Test-Path -Path $LogPath) {
         Write-Host "Log location: $LogPath`n" -ForegroundColor DarkGray
@@ -652,26 +729,49 @@ function Start-PrinterManagement {
     # Check for Administrator privileges
     $isAdmin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
     if (-not $isAdmin) {
-        Write-Host "`n[!] ERROR: This script requires administrator privileges." -ForegroundColor Red
-        Write-Host "Please right-click PowerShell and select 'Run as Administrator'.`n" -ForegroundColor Yellow
-        Read-Host -Prompt "Press Enter to exit..."
+        Write-Host "`n$($script:T.AdminError)" -ForegroundColor Red
+        Write-Host "$($script:T.AdminPrompt)`n" -ForegroundColor Yellow
+        Read-Host -Prompt $script:T.PressEnterToExit
         return
     }
 
     do {
         Show-Banner
 
-        Write-Host " [1] Add Printers (Bulk CSV / TCP-IP / Shared UNC)" -ForegroundColor Cyan
-        Write-Host " [2] Remove Printers (CSV or Interactive List Selection)" -ForegroundColor Cyan
-        Write-Host " [3] Send Test Pages (Bulk CSV)" -ForegroundColor Cyan
-        Write-Host " [4] Clear Print Queue (Purge Spooler)" -ForegroundColor Cyan
-        Write-Host " [5] Inventory Printers (Console Table & CSV Export)" -ForegroundColor Cyan
-        Write-Host " [6] Generate CSV Template" -ForegroundColor Cyan
-        Write-Host " [7] View Activity Log" -ForegroundColor Cyan
-        Write-Host " [8] Exit" -ForegroundColor Yellow
+        Write-Host "   >> " -ForegroundColor Green -NoNewline
+        Write-Host $($script:T.CatOperations) -ForegroundColor Green -NoNewline
+        Write-Host "-------------------------------------------------" -ForegroundColor DarkGray
+        Write-Host $($script:T.OptAddPrinters) -ForegroundColor Cyan -NoNewline
+        Write-Host $($script:T.DescAddPrinters) -ForegroundColor DarkGray
+        Write-Host $($script:T.OptRemPrinters) -ForegroundColor Cyan -NoNewline
+        Write-Host $($script:T.DescRemPrinters) -ForegroundColor DarkGray
+        Write-Host ""
+        Write-Host "   >> " -ForegroundColor Green -NoNewline
+        Write-Host $($script:T.CatDiagnostics) -ForegroundColor Green -NoNewline
+        Write-Host "------------------------------------------------" -ForegroundColor DarkGray
+        Write-Host $($script:T.OptSendTest) -ForegroundColor Cyan -NoNewline
+        Write-Host $($script:T.DescSendTest) -ForegroundColor DarkGray
+        Write-Host $($script:T.OptClearQueue) -ForegroundColor Cyan -NoNewline
+        Write-Host $($script:T.DescClearQueue) -ForegroundColor DarkGray
+        Write-Host ""
+        Write-Host "   >> " -ForegroundColor Green -NoNewline
+        Write-Host $($script:T.CatSystem) -ForegroundColor Green -NoNewline
+        Write-Host "-----------------------------------------------------" -ForegroundColor DarkGray
+        Write-Host $($script:T.OptInventory) -ForegroundColor Cyan -NoNewline
+        Write-Host $($script:T.DescInventory) -ForegroundColor DarkGray
+        Write-Host $($script:T.OptViewLog) -ForegroundColor Cyan -NoNewline
+        Write-Host $($script:T.DescViewLog) -ForegroundColor DarkGray
+        Write-Host ""
+        Write-Host "   ---------------------------------------------------------------" -ForegroundColor DarkGray
+        Write-Host $($script:T.OptExit) -ForegroundColor Yellow
+        Write-Host ""
+        Write-Host $($script:T.MadeWith) -ForegroundColor DarkGray -NoNewline
+        Write-Host "<3" -ForegroundColor Red -NoNewline
+        Write-Host $($script:T.By) -ForegroundColor DarkGray -NoNewline
+        Write-Host "IamCarron" -ForegroundColor Magenta
         Write-Host ""
 
-        $option = Read-Host "Select an option (1-8)"
+        $option = Read-Host $($script:T.SelectOption)
 
         switch ($option) {
             "1" { Add-Printers }
@@ -679,17 +779,18 @@ function Start-PrinterManagement {
             "3" { Send-TestPages }
             "4" { Clear-PrintQueues }
             "5" { Inventory-Printers }
-            "6" { New-PrinterTemplateCsv }
-            "7" { Show-ActivityLog }
-            "8" {
-                Write-Host "`nExiting PrinterManagement. Goodbye!`n" -ForegroundColor Cyan
+            "6" { Show-ActivityLog }
+            "0" {
+                Write-Host ""
+                Write-Host $($script:T.Disconnecting) -ForegroundColor DarkCyan
+                Write-Host "$($script:T.SessionTerminated)`n" -ForegroundColor Cyan
             }
             default {
-                Write-Warning "Invalid option. Please choose a number between 1 and 8."
+                Write-Warning $($script:T.InvalidOption)
                 Start-Sleep -Seconds 1
             }
         }
-    } while ($option -ne "8")
+    } while ($option -ne "0")
 }
 
 # Auto-run menu when executed directly (not in test mode)

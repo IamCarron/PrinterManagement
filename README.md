@@ -43,24 +43,33 @@ Automated, robust, and enterprise-grade PowerShell automation suite for managing
 ## 🖥️ Interactive Console
 
 ```text
- +============================================================================+
- |   ___      _      __          __  ___                                      |
- |  / _ \____(_)__  / /____ ____/  |/  /__ ____  ___ ____ ____ __ _  ___ ___  |
- | / ___/ __/ / _ \/ __/ -_) __/ /|_/ / _ `/ _ \/ _ `/ _ `/ -_)  ' \/ -_) _ \ |
- |/_/  /_/ /_/_//_/\__/\__/_/ /_/  /_/\_,_/_//_/\_,_/\_, /\__/_/_/_/\__/_//_/ |
- |                                                  /___/                     |
- |                      Windows Printer Management Suite                      |
- |                                Version 3.1.0                               |
- +============================================================================+
+  ===========================================================================
+    ___      _      __          __  ___
+   / _ \____(_)__  / /____ ____/  |/  /__ ____  ___ ____ ____ __ _  ___ ___
+  / ___/ __/ / _ \/ __/ -_) __/ /|_/ / _ `/ _ \/ _ `/ _ `/ -_)  ' \/ -_) _ \
+ /_/  /_/ /_/_//_/\__/\__/_/ /_/  /_/\_,_/_//_/\_,_/\_, /\__/_/_/_/\__/_//_/
+                                                    /___/
+  ===========================================================================
+   v3.2.0 | Windows Printer Management Suite
+   github.com/IamCarron/PrinterManagement
+  ===========================================================================
 
- [1] Add Printers (Bulk CSV / TCP-IP / Shared UNC)
- [2] Remove Printers (CSV or Interactive List Selection)
- [3] Send Test Pages (Bulk CSV)
- [4] Clear Print Queue (Purge Spooler)
- [5] Inventory Printers (Console Table & CSV Export)
- [6] Generate CSV Template
- [7] View Activity Log
- [8] Exit
+   >> OPERATIONS -------------------------------------------------
+      [1]  Add Printers         Bulk CSV / TCP-IP / Shared UNC
+      [2]  Remove Printers      CSV or interactive selection
+
+   >> DIAGNOSTICS ------------------------------------------------
+      [3]  Send Test Pages      CIM dispatch with printui fallback
+      [4]  Clear Print Queue    Purge Spooler & restart service
+
+   >> SYSTEM -----------------------------------------------------
+      [5]  Inventory Printers   Console table & CSV export
+      [6]  View Activity Log    Review recent operations
+
+   ---------------------------------------------------------------
+      [0]  Exit
+
+                         Made with <3 by IamCarron
 ```
 
 ---
@@ -88,8 +97,8 @@ Open PowerShell as **Administrator** and run:
 .\PrinterManagement.ps1
 ```
 
-### 3. Generate a Sample CSV Template
-Select option `6` from the menu to generate `template_printers.csv`, or create your own custom CSV file.
+### 3. Prepare Your Printer CSV
+Create a CSV file with your printers (see the [CSV File Specifications](#-csv-file-specifications) section below), or copy the sample template directly from this README.
 
 ---
 
