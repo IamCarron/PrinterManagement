@@ -63,7 +63,7 @@ Automated, robust, and enterprise-grade PowerShell automation suite for managing
       [4]  Clear Print Queue    Purge Spooler & restart service
 
    >> SYSTEM -----------------------------------------------------
-      [5]  Inventory Printers   Console table & CSV export
+      [5]  Inventory Printers   GUI table & CSV export
       [6]  View Activity Log    Review recent operations
 
    ---------------------------------------------------------------
